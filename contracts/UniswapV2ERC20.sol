@@ -1,14 +1,19 @@
 pragma solidity =0.5.16;
 
+import './interfaces/IERC20.sol';
 import './interfaces/IUniswapV2ERC20.sol';
 import './libraries/SafeMath.sol';
 
 contract UniswapV2ERC20 is IUniswapV2ERC20 {
     using SafeMath for uint;
 
-    string public constant name = 'Uniswap V2';
-    string public constant symbol = 'UNI-V2';
-    uint8 public constant decimals = 18;
+    // string public name;
+    // string public symbol;
+    
+    // string public constant name = 'Uniswap V2';
+    // string public constant symbol = 'UNI-V2';
+
+    uint8 public constant decimals = 8;
     uint  public totalSupply;
     mapping(address => uint) public balanceOf;
     mapping(address => mapping(address => uint)) public allowance;
@@ -22,19 +27,19 @@ contract UniswapV2ERC20 is IUniswapV2ERC20 {
     event Transfer(address indexed from, address indexed to, uint value);
 
     constructor() public {
-        uint chainId;
-        assembly {
-            chainId := chainid
-        }
-        DOMAIN_SEPARATOR = keccak256(
-            abi.encode(
-                keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'),
-                keccak256(bytes(name)),
-                keccak256(bytes('1')),
-                chainId,
-                address(this)
-            )
-        );
+        // uint chainId;
+        // assembly {
+        //     chainId := chainid
+        // }
+        // DOMAIN_SEPARATOR = keccak256(
+        //     abi.encode(
+        //         keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'),
+        //         keccak256(bytes(name)),
+        //         keccak256(bytes('1')),
+        //         chainId,
+        //         address(this)
+        //     )
+        // );
     }
 
     function _mint(address to, uint value) internal {

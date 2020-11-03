@@ -11,7 +11,7 @@ import UniswapV2Pair from '../build/UniswapV2Pair.json'
 
 chai.use(solidity)
 
-const TEST_ADDRESSES: [string, string] = [
+let TEST_ADDRESSES: [string, string] = [
   '0x1000000000000000000000000000000000000000',
   '0x2000000000000000000000000000000000000000'
 ]
@@ -29,6 +29,9 @@ describe('UniswapV2Factory', () => {
   beforeEach(async () => {
     const fixture = await loadFixture(factoryFixture)
     factory = fixture.factory
+
+    // token addresses should be in lexical order for the tests to pass
+    TEST_ADDRESSES = [fixture.token1.address, fixture.token0.address]
   })
 
   it('feeTo, feeToSetter, allPairsLength', async () => {

@@ -21,7 +21,7 @@ describe('UniswapV2Pair', () => {
     mnemonic: 'horn horn horn horn horn horn horn horn horn horn horn horn',
     gasLimit: 9999999
   })
-  const [wallet, other] = provider.getWallets()
+  const [wallet, swapper, other] = provider.getWallets()
   const loadFixture = createFixtureLoader(provider, [wallet])
 
   let factory: Contract
@@ -280,5 +280,47 @@ describe('UniswapV2Pair', () => {
     // ...because the initial liquidity amounts were equal
     expect(await token0.balanceOf(pair.address)).to.eq(bigNumberify(1000).add('249501683697445'))
     expect(await token1.balanceOf(pair.address)).to.eq(bigNumberify(1000).add('250000187312969'))
+  })
+
+  it('swapFeeTo:on:1', async () => {
+    await factory.setSwapFeeTo(other.address)
+
+    const token0Amount = expandTo18Decimals(1000)
+    const token1Amount = expandTo18Decimals(1000)
+    await addLiquidity(token0Amount, token1Amount)
+
+    // amount1In
+    const swapAmount = expandTo18Decimals(1)
+    const expectedOutputAmount = bigNumberify('996006981039903216')
+    await token1.transfer(pair.address, swapAmount)
+    await pair.swap(expectedOutputAmount, 0, swapper.address, '0x', overrides)
+
+    expect(await token0.balanceOf(swapper.address)).to.eq(expectedOutputAmount)
+
+    // amount1In * 99.95%
+    expect(await token1.balanceOf(pair.address)).to.eq("1000999500000000000000")
+    // amount1In * 0.05%
+    expect(await token1.balanceOf(other.address)).to.eq("500000000000000")
+  })
+
+  it('swapFeeTo:on:0', async () => {
+    await factory.setSwapFeeTo(other.address)
+
+    const token0Amount = expandTo18Decimals(1000)
+    const token1Amount = expandTo18Decimals(1000)
+    await addLiquidity(token0Amount, token1Amount)
+
+    // amount1In
+    const swapAmount = expandTo18Decimals(1)
+    const expectedOutputAmount = bigNumberify('996006981039903216')
+    await token0.transfer(pair.address, swapAmount)
+    await pair.swap(0, expectedOutputAmount, swapper.address, '0x', overrides)
+
+    expect(await token1.balanceOf(swapper.address)).to.eq(expectedOutputAmount)
+
+    // amount1In * 99.95%
+    expect(await token0.balanceOf(pair.address)).to.eq("1000999500000000000000")
+    // amount1In * 0.05%
+    expect(await token0.balanceOf(other.address)).to.eq("500000000000000")
   })
 })

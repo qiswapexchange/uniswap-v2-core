@@ -12,6 +12,9 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
     using SafeMath  for uint;
     using UQ112x112 for uint224;
 
+    string public name;
+    string public symbol;
+
     uint public constant MINIMUM_LIQUIDITY = 10**3;
     bytes4 private constant SELECTOR = bytes4(keccak256(bytes('transfer(address,uint256)')));
 
@@ -67,6 +70,13 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
         require(msg.sender == factory, 'UniswapV2: FORBIDDEN'); // sufficient check
         token0 = _token0;
         token1 = _token1;
+
+        symbol = append("QILP-", IERC20(_token0).symbol(), "_", IERC20(_token1).symbol());
+        name = append("QI Swap Liquidity Token -- ", IERC20(_token0).name(), " : ", IERC20(_token1).name());
+    }
+
+    function append(string memory a, string memory b, string memory c, string memory d) internal pure returns (string memory) {
+        return string(abi.encodePacked(a, b, c, d));
     }
 
     // update reserves and, on the first call per block, price accumulators
@@ -173,6 +183,21 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
         balance0 = IERC20(_token0).balanceOf(address(this));
         balance1 = IERC20(_token1).balanceOf(address(this));
         }
+
+        // in the typical case, one of amount0Out/amount1Out is 0
+        // let's say amount0Out = 0, we are swapping token0 for token1, then
+        //   amount0In is the new balance0, which is larger than the old reserve0 (before _update).
+        //   amount0In is the amount that the user already sent to this contract
+        //   amount1In = 0
+        //
+        //   amount{0,}Adjusted are the deltas + fees to reserve we expect.
+        //   taking 0.3% from it, should grow the reserve.
+        //
+        // i see... because amount?In is calculated from amount?Out, it only needs to ensure
+        // that balance?Adjusted had inflated by the requisite amount?In (taking away the swap fees).
+        //
+        // it's kinda neat that this works symmetrically for the assets. adjust the reserves downwards
+        // for the two amount0Out you just calculate the same amountsIn. Kinda interesting code.
         uint amount0In = balance0 > _reserve0 - amount0Out ? balance0 - (_reserve0 - amount0Out) : 0;
         uint amount1In = balance1 > _reserve1 - amount1Out ? balance1 - (_reserve1 - amount1Out) : 0;
         require(amount0In > 0 || amount1In > 0, 'UniswapV2: INSUFFICIENT_INPUT_AMOUNT');
@@ -180,6 +205,31 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
         uint balance0Adjusted = balance0.mul(1000).sub(amount0In.mul(3));
         uint balance1Adjusted = balance1.mul(1000).sub(amount1In.mul(3));
         require(balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2), 'UniswapV2: K');
+        }
+
+        {
+            address feeTo = IUniswapV2Factory(factory).swapFeeTo();
+
+            // CONSIDER: or, mint liquidity instead? but fee is most often one-sided, a little bit weird
+            // to end up paying the converter in liquidity.
+            if (feeTo != address(0)) {
+                // take 0.05% as swap fee that converts to qi by QiConverter
+                if (amount0In > 0) {
+                    uint256 swapFee0 = amount0In.mul(5) / 10000;
+                    balance0 -= swapFee0;
+                    if (swapFee0 > 0) {
+                        _safeTransfer(token0, feeTo, swapFee0);
+                    }
+                }
+
+                if (amount1In > 0) {
+                    uint256 swapFee1 = amount1In.mul(5) / 10000;
+                    balance1 -= swapFee1;
+                    if (swapFee1 > 0) {
+                        _safeTransfer(token1, feeTo, swapFee1);
+                    }
+                }
+            }
         }
 
         _update(balance0, balance1, _reserve0, _reserve1);
