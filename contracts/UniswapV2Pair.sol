@@ -201,6 +201,14 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
         uint amount0In = balance0 > _reserve0 - amount0Out ? balance0 - (_reserve0 - amount0Out) : 0;
         uint amount1In = balance1 > _reserve1 - amount1Out ? balance1 - (_reserve1 - amount1Out) : 0;
         require(amount0In > 0 || amount1In > 0, 'UniswapV2: INSUFFICIENT_INPUT_AMOUNT');
+        
+        // CONSIDER: or, mint liquidity instead? but fee is most often one-sided, a little bit weird
+        // to end up paying the converter in liquidity.
+        // take 0.05% as swap fee that converts to qi by QiConverter
+        uint256 swapFee0 = amount0In > 0 ? amount0In.mul(5) / 10000 : 0;
+        balance0 -= swapFee0;
+        uint256 swapFee1 = amount1In > 0 ? amount1In.mul(5) / 10000 : 0;
+        balance1 -= swapFee1;
         { // scope for reserve{0,1}Adjusted, avoids stack too deep errors
         uint balance0Adjusted = balance0.mul(1000).sub(amount0In.mul(3));
         uint balance1Adjusted = balance1.mul(1000).sub(amount1In.mul(3));
@@ -209,26 +217,10 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 
         {
             address feeTo = IUniswapV2Factory(factory).swapFeeTo();
-
-            // CONSIDER: or, mint liquidity instead? but fee is most often one-sided, a little bit weird
-            // to end up paying the converter in liquidity.
+            // pay fee.
             if (feeTo != address(0)) {
-                // take 0.05% as swap fee that converts to qi by QiConverter
-                if (amount0In > 0) {
-                    uint256 swapFee0 = amount0In.mul(5) / 10000;
-                    balance0 -= swapFee0;
-                    if (swapFee0 > 0) {
-                        _safeTransfer(token0, feeTo, swapFee0);
-                    }
-                }
-
-                if (amount1In > 0) {
-                    uint256 swapFee1 = amount1In.mul(5) / 10000;
-                    balance1 -= swapFee1;
-                    if (swapFee1 > 0) {
-                        _safeTransfer(token1, feeTo, swapFee1);
-                    }
-                }
+                if (amount0In > 0 && swapFee0 > 0) _safeTransfer(token0, feeTo, swapFee0);
+                if (amount1In > 0 && swapFee1 > 0) _safeTransfer(token1, feeTo, swapFee1);
             }
         }
 
